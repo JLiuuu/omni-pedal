@@ -2,9 +2,9 @@
 
 #include <string>
 
-// 提案里的软件：五个效果、Bass Split、旋钮和踏板。
-// bypass 和 delay/chorus/reverb/bass 的干声都在第 0 个采样，不额外推迟。
-// 5 ms 指标量的是这条干声。overdrive 和 distortion 会换成失真后的声音。
+// Proposal software: five effects, Bass Split, knobs, and the footswitch.
+// Bypass, delay, chorus, reverb, and bass keep the dry sample at index 0.
+// The 5 ms budget is that dry path. Overdrive and distortion replace the signal.
 
 namespace stage1 {
 
@@ -23,23 +23,23 @@ const char* effectName(Effect effect);
 bool parseEffect(const std::string& text, Effect& effect);
 
 struct Knobs {
-    float drive = 0.35f;  // 过载/失真强度，delay 的反馈
-    float tone = 0.65f;   // 明暗，chorus 的深度，bass 的音色
-    float mix = 0.45f;    // 湿声大小。bass 是低八度的音量
-    float time = 0.35f;   // delay 时间、chorus 速度、reverb 房间、bass 分界频率
-    float level = 1.0f;   // 输出音量
+    float drive = 0.35f;  // overdrive/distortion amount, and delay feedback
+    float tone = 0.65f;   // brightness, chorus depth, and bass tone
+    float mix = 0.45f;    // wet level. For bass, the octave volume
+    float time = 0.35f;   // delay time, chorus rate, reverb size, bass split
+    float level = 1.0f;   // output level
 };
 
-// 0..255 的旋钮读数换成 0..1。
+// Map an ADS7830 byte, 0..255, to 0..1.
 float knobFromByte(int raw);
 
-// ADS7830 单端通道命令字。通道非法时返回 -1。
+// ADS7830 single-ended command byte. Returns -1 for a bad channel.
 int ads7830Command(int channel);
 
-// time 旋钮 0..1 对应大约 40 ms 到 800 ms。
+// Map the time knob, 0..1, to about 40 ms through 800 ms.
 int delaySamples(float time01, int sampleRate);
 
-// time 旋钮 0..1 对应分界频率 80 Hz 到 250 Hz。
+// Map the time knob, 0..1, to a split from 80 Hz to 250 Hz.
 float splitHzFromTime(float time01);
 
 struct PedalState;
@@ -64,7 +64,7 @@ public:
 
     void process(const float* in, float* out, int n);
 
-    // Bass Split 当前跟踪到的音高。其它效果下这个值没有意义。
+    // Pitch Bass Split is tracking. Meaningless for the other effects.
     float trackedHz() const;
 
 private:
@@ -72,8 +72,8 @@ private:
     void resetOne(Effect effect);
 };
 
-// 踏板消抖。rawPressed 为 true 表示踩下。大约按住 30 ms 才算一次。
-// 返回 true 表示刚刚确认踩下。
+// Footswitch debounce. rawPressed is true while the switch is down.
+// A press counts after about 30 ms. Returns true on the confirmed press.
 class Footswitch {
 public:
     bool update(bool rawPressed, int sampleRate, int samplesAdvanced);
@@ -84,13 +84,13 @@ private:
     int pending_ = 0;
 };
 
-// 一行文字命令，给还没接旋钮时用：
+// One text command, for use before the knobs are wired:
 //   effect overdrive
 //   drive 0.7
 //   next
 bool applyCommand(Pedal& pedal, const std::string& line, std::string& err);
 
-// Pi 上的 ADS7830 和 GPIO。这台电脑上 open 会失败，算法测试不依赖它。
+// ADS7830 and GPIO on the Pi. open fails on this PC. Algorithm tests do not use it.
 class ControlIo {
 public:
     ControlIo();

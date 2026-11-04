@@ -1,40 +1,39 @@
-# Omni Pedal 软件
+# Omni Pedal
 
-对应提案里的效果链：干声直通、overdrive、distortion、delay、chorus、reverb、Bass Split。切换时做大约 10 ms 的交叉淡化。上电输出静音 3 秒。
+Software for the fall proposal: dry bypass, overdrive, distortion, delay, chorus, reverb, and Bass Split. Effect changes crossfade for about 10 ms. The output stays muted for 3 seconds after power-up.
 
-旋钮和踏板的读取写好了，要在 Raspberry Pi 上接上 ADS7830 和开关才能用。电脑上先听 `out/` 里的 wav。
+Knob and footswitch reads are written. They run on a Raspberry Pi with an ADS7830 and a switch. On a PC, listen to the wav files in `out/`.
 
-## 在这台电脑上
+## On this computer
 
-安装过 Cygwin 的 g++ 和 make 之后，双击 `run.bat`，或者：
+After Cygwin g++ and make are installed, double-click `run.bat`, or from the project directory:
 
 ```bash
-cd /cygdrive/c/Users/TT/Desktop/guitar
 make test
 make demo
 ```
 
-`make test` 通过就会打印 `all passed`。
+`make test` prints `all passed` when the checks succeed.
 
-`make demo` 会写出 `out/` 里的试听文件：
+`make demo` writes listening files in `out/`:
 
-- `input.wav`、`output.wav`、`output_no_mute.wav`：干声和 3 秒静音
-- `overdrive.wav`、`distortion.wav`、`delay.wav`、`chorus.wav`、`reverb.wav`
-- `bass_low.wav`：110 Hz，带低八度。`bass_high.wav`：330 Hz，保持原音
-- `switch.wav`：每秒换一个效果
+- `input.wav`, `output.wav`, `output_no_mute.wav`: dry signal and the 3 second mute
+- `overdrive.wav`, `distortion.wav`, `delay.wav`, `chorus.wav`, `reverb.wav`
+- `bass_low.wav`: 110 Hz with the octave below. `bass_high.wav`: 330 Hz, left dry
+- `switch.wav`: one effect change per second
 
-处理自己的录音：
+Process a recording:
 
 ```bash
 ./stage1 --effect overdrive --drive 0.6 my_guitar.wav out/processed.wav
 ./stage1 --effect bass --time 0.6 --mix 0.8 my_guitar.wav out/bass.wav
 ```
 
-`--time` 在 Bass Split 里是分界频率，0 大约 80 Hz，1 大约 250 Hz。
+For Bass Split, `--time` is the split frequency: 0 is about 80 Hz and 1 is about 250 Hz.
 
-## 在 Raspberry Pi 上
+## On the Raspberry Pi
 
-Codec Zero 接在 AUX IN / AUX OUT。先让声卡走线路输入和线路输出，不要用板载麦克风那一路。
+Use Codec Zero AUX IN and AUX OUT. Set the codec for line input and line output. The onboard microphone jack is the one with mic bias.
 
 ```bash
 sudo apt install g++ make libasound2-dev
@@ -42,8 +41,8 @@ make
 sudo chrt -f 60 ./stage1 --live hw:CodecZero --gpio 17 --i2c 1
 ```
 
-没接旋钮时，可以在这个终端里输入 `effect overdrive` 或 `next`。踏板用 GPIO 17，避开 Codec Zero 占用的 2、3、18、19、20、21、23、24、27。五个旋钮接 ADS7830 的通道 0 到 4，地址 `0x48`，顺序是 drive、tone、mix、time、level。
+Without the knobs attached, type `effect overdrive` or `next` in that terminal. The footswitch uses GPIO 17, leaving the Codec Zero pins 2, 3, 18, 19, 20, 21, 23, 24, and 27 free. Five knobs go to ADS7830 channels 0 through 4 at address `0x48`, in the order drive, tone, mix, time, level.
 
-名字不对的话先看 `arecord -l`，再把设备名传进去，例如 `./stage1 --live hw:0`。
+If the device name is different, run `arecord -l` and pass that name, for example `./stage1 --live hw:0`.
 
-程序会打印实际打开的周期。如果软件缓冲上限到了 5 ms 或以上，终端里会有一行 warning。
+The program prints the period it actually opened. If the software buffer upper bound reaches 5 ms or more, the terminal prints a warning.
