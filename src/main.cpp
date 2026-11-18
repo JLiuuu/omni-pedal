@@ -1,9 +1,12 @@
+#include "control.hpp"
 #include "pedal.hpp"
 #include "stage1.hpp"
 #include "wav.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
@@ -11,6 +14,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #if OMNI_HAS_ALSA
@@ -277,8 +281,39 @@ void printUsage() {
     std::cout << "stage1                         write demo wavs in out/\n";
     std::cout << "stage1 in.wav out.wav          dry signal, 3 s mute\n";
     std::cout << "stage1 --effect bass --mix 0.8 in.wav out.wav\n";
-    std::cout << "stage1 --live [device] [--gpio 17] [--i2c 1]\n";
+    std::cout << "stage1 --panel [--port 8765]     knobs and effects for the touchscreen\n";
+    std::cout << "stage1 --live [device] [--gpio 17] [--i2c 1] [--port 8765]\n";
     std::cout << "  commands on the Pi: effect overdrive | drive 0.5 | next\n";
+    std::cout << "  touchscreen: python3 gui/server.py   then open http://127.0.0.1:8080\n";
+}
+
+volatile std::sig_atomic_t g_panelStop = 0;
+
+void onPanelStop(int) {
+    g_panelStop = 1;
+}
+
+int runPanel(int port) {
+    if (port <= 0) {
+        std::cerr << "panel needs a port, for example --port 8765\n";
+        return 1;
+    }
+    stage1::Pedal pedal;
+    pedal.prepare(stage1::kSampleRate);
+    stage1::ControlServer panel;
+    std::string err;
+    if (!panel.start(pedal, port, err)) {
+        std::cerr << err << "\n";
+        return 1;
+    }
+    std::signal(SIGINT, onPanelStop);
+    std::signal(SIGTERM, onPanelStop);
+    std::cout << "panel listening on 127.0.0.1:" << port << "\n";
+    std::cout << "touchscreen: python3 gui/server.py\n";
+    while (!g_panelStop) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    return 0;
 }
 
 #if OMNI_HAS_ALSA
@@ -321,7 +356,7 @@ int recover(snd_pcm_t* pcm, int rc) {
     return snd_pcm_recover(pcm, rc, 1);
 }
 
-int runLive(const std::string& device, int gpioPin, int i2cBus, int i2cAddr) {
+int runLive(const std::string& device, int gpioPin, int i2cBus, int i2cAddr, int panelPort) {
     snd_pcm_t* cap = nullptr;
     snd_pcm_t* play = nullptr;
     if (snd_pcm_open(&cap, device.c_str(), SND_PCM_STREAM_CAPTURE, 0) < 0 ||
@@ -369,6 +404,15 @@ int runLive(const std::string& device, int gpioPin, int i2cBus, int i2cAddr) {
 
     stage1::Pedal pedal;
     pedal.prepare(static_cast<int>(rate));
+    stage1::ControlServer panel;
+    if (panelPort > 0) {
+        std::string panelErr;
+        if (!panel.start(pedal, panelPort, panelErr)) {
+            std::cerr << panelErr << "\n";
+        } else {
+            std::cout << "touchscreen socket 127.0.0.1:" << panelPort << "\n";
+        }
+    }
     stage1::DryPath dry;
     dry.prepare(static_cast<int>(rate), stage1::kMuteSeconds);
     stage1::ControlIo controls;
@@ -409,7 +453,7 @@ int runLive(const std::string& device, int gpioPin, int i2cBus, int i2cAddr) {
         if (sincePots >= static_cast<int>(rate) / 50) {
             sincePots = 0;
             stage1::Knobs knobs = pedal.knobs();
-            if (controls.readPots(knobs)) {
+            if (!panel.commandsRecent() && controls.readPots(knobs)) {
                 pedal.setKnobs(knobs);
             }
         }
@@ -471,7 +515,7 @@ int runLive(const std::string& device, int gpioPin, int i2cBus, int i2cAddr) {
 
 #else
 
-int runLive(const std::string&, int, int, int) {
+int runLive(const std::string&, int, int, int, int) {
     std::cerr << "Live mode is for the Raspberry Pi.\n";
     std::cerr << "On this PC the progress demo is: ./stage1\n";
     return 1;
@@ -486,6 +530,8 @@ int main(int argc, char** argv) {
         return runDemo();
     }
     bool live = false;
+    bool panel = false;
+    int panelPort = 8765;
     std::string device = "hw:CodecZero";
     int gpioPin = -1;
     int i2cBus = -1;
@@ -504,7 +550,15 @@ int main(int argc, char** argv) {
             }
             return argv[++i];
         };
-        if (arg == "--live") {
+        if (arg == "--panel") {
+            panel = true;
+        } else if (arg == "--port") {
+            const char* v = need("--port");
+            if (v == nullptr) {
+                return 1;
+            }
+            panelPort = std::atoi(v);
+        } else if (arg == "--live") {
             live = true;
             if (i + 1 < argc && std::strncmp(argv[i + 1], "--", 2) != 0) {
                 device = argv[++i];
@@ -559,7 +613,10 @@ int main(int argc, char** argv) {
         }
     }
     if (live) {
-        return runLive(device, gpioPin, i2cBus, i2cAddr);
+        return runLive(device, gpioPin, i2cBus, i2cAddr, panelPort);
+    }
+    if (panel) {
+        return runPanel(panelPort);
     }
     if (files.size() == 2) {
         if (!effectSet) {

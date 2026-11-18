@@ -348,6 +348,10 @@ int runFxTests() {
         pedal.process(silence.data(), out.data(), 2000);
         check(parsed && atDelay && skipped == Effect::Chorus && pedal.current() == Effect::Chorus,
               "commands_change_effect");
+        const std::string status = stage1::pedalStatus(pedal);
+        check(status.find("effect chorus\n") != std::string::npos &&
+                  status.size() >= 4 && status.compare(status.size() - 4, 4, "end\n") == 0,
+              "status_for_the_panel");
     }
 
     if (g_failed != 0) {

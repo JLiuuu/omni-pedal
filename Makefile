@@ -23,8 +23,8 @@ CORE := src/wav.cpp src/stage1.cpp src/pedal.cpp
 stage1_test$(EXE): src/test.cpp src/test_fx.cpp $(CORE) include/stage1.hpp include/pedal.hpp include/wav.hpp
 	$(CXX) $(CXXFLAGS) -o $@ src/test.cpp src/test_fx.cpp $(CORE) $(LDFLAGS)
 
-stage1$(EXE): src/main.cpp $(CORE) include/stage1.hpp include/pedal.hpp include/wav.hpp
-	$(CXX) $(CXXFLAGS) -o $@ src/main.cpp $(CORE) $(LDFLAGS)
+stage1$(EXE): src/main.cpp src/control.cpp $(CORE) include/stage1.hpp include/pedal.hpp include/wav.hpp include/control.hpp
+	$(CXX) $(CXXFLAGS) -o $@ src/main.cpp src/control.cpp $(CORE) $(LDFLAGS) -lpthread
 
 test: stage1_test$(EXE)
 	./stage1_test$(EXE)

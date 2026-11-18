@@ -61,6 +61,9 @@ public:
     void request(Effect effect);
     Effect nextEffect();
     Effect current() const;
+    // Effect requested by the footswitch, a command, or the touchscreen.
+    // This updates immediately. current() follows after the crossfade.
+    Effect selected() const;
 
     void process(const float* in, float* out, int n);
 
@@ -89,6 +92,9 @@ private:
 //   drive 0.7
 //   next
 bool applyCommand(Pedal& pedal, const std::string& line, std::string& err);
+
+// Lines the touchscreen reads: effect, five knobs, then "end".
+std::string pedalStatus(const Pedal& pedal);
 
 // ADS7830 and GPIO on the Pi. open fails on this PC. Algorithm tests do not use it.
 class ControlIo {

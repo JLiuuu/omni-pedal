@@ -41,7 +41,29 @@ make
 sudo chrt -f 60 ./stage1 --live hw:CodecZero --gpio 17 --i2c 1
 ```
 
-Without the knobs attached, type `effect overdrive` or `next` in that terminal. The footswitch uses GPIO 17, leaving the Codec Zero pins 2, 3, 18, 19, 20, 21, 23, 24, and 27 free. Five knobs go to ADS7830 channels 0 through 4 at address `0x48`, in the order drive, tone, mix, time, level.
+Without the knobs attached, type `effect overdrive` or `next` in that terminal, or use the touchscreen. The footswitch uses GPIO 17, leaving the Codec Zero pins 2, 3, 18, 19, 20, 21, 23, 24, and 27 free. Five knobs go to ADS7830 channels 0 through 4 at address `0x48`, in the order drive, tone, mix, time, level.
+
+## Touchscreen
+
+The page shows the current effect, Drive, Tone, Mix, Time, and Level. Finger taps switch effects. Finger drags move a knob. On the official Pi display, Full screen fills the 800x480 panel.
+
+On a PC, double-click `gui.bat`, or:
+
+```bash
+./stage1 --panel
+python3 gui/server.py
+```
+
+Then open http://127.0.0.1:8080. `--panel` has no audio. It is there so the screen can be tried before the codec is connected. The page says "Audio engine connected" when that socket is up.
+
+On the Pi, `--live` opens the same socket. Start the page beside it:
+
+```bash
+python3 gui/server.py
+chromium-browser --kiosk http://127.0.0.1:8080
+```
+
+Physical knobs still update the screen. For about one second after a finger drag, the screen value is kept so the ADS7830 does not snap it back mid-drag.
 
 If the device name is different, run `arecord -l` and pass that name, for example `./stage1 --live hw:0`.
 

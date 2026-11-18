@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstring>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #if OMNI_HAS_ALSA
@@ -525,6 +526,32 @@ Effect Pedal::nextEffect() {
 
 Effect Pedal::current() const {
     return impl_->active;
+}
+
+Effect Pedal::selected() const {
+    if (impl_ == nullptr) {
+        return Effect::Bypass;
+    }
+    const int value = impl_->requested.load();
+    if (value < 0 || value >= static_cast<int>(Effect::Count)) {
+        return Effect::Bypass;
+    }
+    return static_cast<Effect>(value);
+}
+
+std::string pedalStatus(const Pedal& pedal) {
+    const Knobs k = pedal.knobs();
+    std::ostringstream os;
+    os.setf(std::ios::fixed);
+    os.precision(3);
+    os << "effect " << effectName(pedal.selected()) << "\n";
+    os << "drive " << k.drive << "\n";
+    os << "tone " << k.tone << "\n";
+    os << "mix " << k.mix << "\n";
+    os << "time " << k.time << "\n";
+    os << "level " << k.level << "\n";
+    os << "end\n";
+    return os.str();
 }
 
 float Pedal::trackedHz() const {
